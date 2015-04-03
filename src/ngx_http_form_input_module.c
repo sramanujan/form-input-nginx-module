@@ -45,6 +45,25 @@ static char *ngx_http_form_input_merge_loc_conf(ngx_conf_t *cf, void *parent,
 
 #endif
 
+inline int ishex(int x) {
+    return (x >= '0' && x <= '9') || (x >= 'a' && x <= 'f') || (x >= 'A' && x <= 'F');
+}
+ 
+size_t decode(u_char *s, size_t s_len, u_char *dec) {
+    u_char *o;
+    u_char *end = s + s_len;
+    int c;
+ 
+    for (o = dec; s < end; o++) {
+        c = *s++;
+        if (c == '+') c = ' ';
+        else if (c == '%' && ( !ishex(*s++) || !ishex(*s++) || !sscanf((const char*)(s - 2), "%2x", &c))) return -1;
+        if (dec) *o = c;
+    }
+
+    return o - dec;
+}
+
 static ngx_int_t ngx_http_form_input_init(ngx_conf_t *cf);
 static ngx_int_t ngx_http_form_input_handler(ngx_http_request_t *r);
 static void ngx_http_form_input_post_read(ngx_http_request_t *r);
@@ -183,9 +202,9 @@ static ngx_int_t
 ngx_http_form_input_arg(ngx_http_request_t *r, u_char *arg_name, size_t arg_len,
     ngx_str_t *value, ngx_flag_t multi)
 {
-    u_char              *p, *v, *last, *buf;
+    u_char              *p, *v, *last, *buf, *dec;
     ngx_chain_t         *cl;
-    size_t               len = 0;
+    size_t               len = 0, dec_len = 0;
     ngx_array_t         *array = NULL;
     ngx_str_t           *s;
     ngx_buf_t           *b;
@@ -287,18 +306,24 @@ ngx_http_form_input_arg(ngx_http_request_t *r, u_char *arg_name, size_t arg_len,
                 dd("found &, pointing it to %d...", (int) (p - buf));
             }
 
+            dec = ngx_palloc(r->pool, p-v);
+            dec_len = decode(v, p-v, dec);
             if (multi) {
                 s = ngx_array_push(array);
                 if (s == NULL) {
                     return NGX_ERROR;
                 }
-                s->data = v;
-                s->len = p - v;
+                //s->data = v;
+                //s->len = p - v;
+                s->data = dec;
+                s->len = dec_len;
                 dd("array var:%.*s", (int) s->len, s->data);
 
             } else {
-                value->data = v;
-                value->len = p - v;
+                //value->data = v;
+                //value->len = p - v;
+                value->data = dec;
+                value->len = dec_len;
                 dd("value: [%.*s]", (int) value->len, value->data);
                 return NGX_OK;
             }
