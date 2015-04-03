@@ -58,6 +58,7 @@ size_t decode(u_char *s, size_t s_len, u_char *dec) {
         c = *s++;
         if (c == '+') c = ' ';
         else if (c == '%' && ( !ishex(*s++) || !ishex(*s++) || !sscanf((const char*)(s - 2), "%2x", &c))) return -1;
+        if (c == ',') c = '.';
         if (dec) *o = c;
     }
 
